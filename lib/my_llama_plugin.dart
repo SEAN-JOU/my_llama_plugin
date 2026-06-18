@@ -69,13 +69,13 @@ class MyLlamaPlugin {
     try {
       // 呼叫原生的 'disposeModel'，不需要傳遞參數
       await _channel.invokeMethod('disposeModel');
-      debugPrint("🤖 [Dart 端] 請求釋放記憶體成功");
+      debugPrint("🤖 [推論引擎] 請求釋放記憶體成功");
       return true;
     } on PlatformException catch (e) {
-      debugPrint("🤖 [Dart 端] 釋放記憶體發生平台例外: ${e.message}");
+      debugPrint("🤖 [推論引擎] 釋放記憶體發生平台例外: ${e.message}");
       return false;
     } catch (e) {
-      debugPrint("🤖 [Dart 端] 釋放模型失敗: $e");
+      debugPrint("🤖 [推論引擎] 釋放模型失敗: $e");
       return false;
     }
   }

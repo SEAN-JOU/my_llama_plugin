@@ -40,6 +40,7 @@ LlamaEngine::~LlamaEngine() {
 bool LlamaEngine::loadModel(const std::string & path, int contextSize, int gpuLayers, int threads) {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    cancelled_.store(false, std::memory_order_relaxed);
     disposeLocked();
     ensureBackendInitialized();
 
@@ -54,10 +55,15 @@ bool LlamaEngine::loadModel(const std::string & path, int contextSize, int gpuLa
     const int nCtx = normalizePositive(contextSize, kDefaultContextSize);
 
     llama_context_params ctxParams = llama_context_default_params();
-    ctxParams.n_ctx = static_cast<uint32_t>(nCtx);
-    ctxParams.n_batch = static_cast<uint32_t>(nCtx);
+    ctxParams.n_ctx              = static_cast<uint32_t>(nCtx);
+    ctxParams.n_batch            = std::min(static_cast<uint32_t>(nCtx), 512u);
+    ctxParams.n_ubatch           = std::min(ctxParams.n_batch, 512u);
+    ctxParams.flash_attn_type    = LLAMA_FLASH_ATTN_TYPE_ENABLED;
+    ctxParams.offload_kqv        = (gpuLayers > 0);
+    ctxParams.type_k             = GGML_TYPE_Q8_0;
+    ctxParams.type_v             = GGML_TYPE_Q8_0;
     if (threads > 0) {
-        ctxParams.n_threads = threads;
+        ctxParams.n_threads       = threads;
         ctxParams.n_threads_batch = threads;
     }
 
@@ -160,6 +166,10 @@ std::string LlamaEngine::generate(
     llama_token nextToken = LLAMA_TOKEN_NULL;
 
     for (int i = 0; i < tokensToGenerate; ++i) {
+        if (cancelled_.load(std::memory_order_relaxed)) {
+            break;
+        }
+
         if (llama_decode(ctx_, batch) != 0) {
             break;
         }
@@ -178,6 +188,7 @@ std::string LlamaEngine::generate(
 }
 
 void LlamaEngine::dispose() {
+    cancelled_.store(true, std::memory_order_relaxed);
     std::lock_guard<std::mutex> lock(mutex_);
     disposeLocked();
 }

@@ -35,7 +35,10 @@ class _MyAppState extends State<MyApp> {
       _output = 'Loading model...';
     });
 
-    final loaded = await _plugin.loadModel(_modelPathController.text.trim());
+    final loaded = await _plugin.loadModel(
+      _modelPathController.text.trim(),
+      gpuLayers: 99,
+    );
     if (!mounted) return;
 
     setState(() {

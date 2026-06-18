@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include <string>
 
@@ -23,6 +24,7 @@ private:
     std::string tokenToPiece(int token) const;
 
     std::mutex mutex_;
+    std::atomic<bool> cancelled_{false};
     llama_model * model_ = nullptr;
     llama_context * ctx_ = nullptr;
 };
