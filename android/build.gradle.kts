@@ -57,6 +57,10 @@ android {
                 cppFlags("-std=c++17")
             }
         }
+        ndk {
+            abiFilters.add("arm64-v8a") // 絕大多數現代 Android 實機
+            abiFilters.add("x86_64")    // 電腦上的 Android 模擬器
+        }
     }
 
     externalNativeBuild {
