@@ -9,27 +9,39 @@ Pod::Spec.new do |s|
   s.author           = { 'Your Company' => 'email@example.com' }
   s.source           = { :path => '.' }
 
-  # --- 我們剛剛設定好的編譯邏輯 ---
-  # 1. 包含所有原始碼
-  s.source_files = 'Classes/**/*.{swift,h,m,mm,c,cpp}'
-  
-  # 2. 排除會導致編譯衝突的範例與測試檔
-  s.exclude_files = 'Classes/core/examples/**/*', 'Classes/core/tests/**/*', 'Classes/core/pocs/**/*'
+  # 1. 只編進 Flutter bridge 與 llama.cpp/ggml 核心，避免 tools/examples/tests 裡的 main() 進入 plugin。
+  s.source_files = [
+    'Classes/*.{swift,h,hpp,mm,cpp}',
+    'Classes/core/include/**/*.h',
+    'Classes/core/src/**/*.{h,cpp}',
+    'Classes/core/ggml/include/**/*.h',
+    'Classes/core/ggml/src/*.{h,c,cpp}',
+    'Classes/core/ggml/src/ggml-cpu/*.{h,c,cpp}',
+    'Classes/core/ggml/src/ggml-cpu/arch/arm/*.{h,c,cpp}'
+  ]
 
-  # 3. 將 llama.cpp 的標頭檔標記為私有，避免 Xcode 扁平化匯出產生碰撞
-  s.private_header_files = 'Classes/core/**/*.h'
+  # 2. 將 llama.cpp 的標頭檔標記為私有，避免 Xcode 扁平化匯出產生碰撞
+  s.private_header_files = 'Classes/LlamaEngine.hpp', 'Classes/core/**/*.h'
 
-  # 4. Flutter 與平台設定
+  # 3. Flutter 與平台設定
   s.dependency 'Flutter'
   s.platform = :ios, '12.0'
   
-  # 5. 引入 Metal 加速框架
-  s.frameworks = 'Metal', 'Foundation'
+  # 4. 第一版先走 CPU backend，後續可再加入 Metal/Vulkan 加速。
+  s.frameworks = 'Foundation', 'Accelerate'
 
-  # 6. 開啟 Metal 加速與 C++17 標準
-  s.compiler_flags = '-DGGML_USE_METAL'
+  # 5. 開啟 CPU backend 與 C++17 標準
+  s.compiler_flags = '-DGGML_USE_CPU -DGGML_VERSION=\"0.15.1\" -DGGML_COMMIT=\"unknown\"'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17'
+    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
+    'HEADER_SEARCH_PATHS' => [
+      '$(PODS_TARGET_SRCROOT)/Classes',
+      '$(PODS_TARGET_SRCROOT)/Classes/core/include',
+      '$(PODS_TARGET_SRCROOT)/Classes/core/src',
+      '$(PODS_TARGET_SRCROOT)/Classes/core/ggml/include',
+      '$(PODS_TARGET_SRCROOT)/Classes/core/ggml/src',
+      '$(PODS_TARGET_SRCROOT)/Classes/core/ggml/src/ggml-cpu'
+    ].join(' ')
   }
 end

@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-
-import 'package:flutter/services.dart';
 import 'package:my_llama_plugin/my_llama_plugin.dart';
 
 void main() {
@@ -16,34 +13,53 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
-  final _myLlamaPlugin = MyLlamaPlugin();
+  final _plugin = MyLlamaPlugin();
+  final _modelPathController = TextEditingController();
+  final _promptController = TextEditingController(text: 'Hello, my name is');
+
+  bool _isBusy = false;
+  bool _isLoaded = false;
+  String _output = '';
 
   @override
-  void initState() {
-    super.initState();
-    initPlatformState();
+  void dispose() {
+    _modelPathController.dispose();
+    _promptController.dispose();
+    _plugin.disposeModel();
+    super.dispose();
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    // We also handle the message potentially returning null.
-    try {
-      platformVersion =
-          await _myLlamaPlugin.getPlatformVersion() ?? 'Unknown platform version';
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
+  Future<void> _loadModel() async {
+    setState(() {
+      _isBusy = true;
+      _output = 'Loading model...';
+    });
 
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
+    final loaded = await _plugin.loadModel(_modelPathController.text.trim());
     if (!mounted) return;
 
     setState(() {
-      _platformVersion = platformVersion;
+      _isBusy = false;
+      _isLoaded = loaded;
+      _output = loaded ? 'Model loaded.' : 'Model failed to load.';
+    });
+  }
+
+  Future<void> _generate() async {
+    setState(() {
+      _isBusy = true;
+      _output = 'Generating...';
+    });
+
+    final response = await _plugin.generate(
+      _promptController.text,
+      maxTokens: 128,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _isBusy = false;
+      _output = response?.isNotEmpty == true ? response! : 'No response.';
     });
   }
 
@@ -51,8 +67,41 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(title: const Text('Plugin example app')),
-        body: Center(child: Text('Running on: $_platformVersion\n')),
+        appBar: AppBar(title: const Text('Llama GGUF plugin')),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextField(
+              controller: _modelPathController,
+              decoration: const InputDecoration(
+                labelText: 'GGUF model path',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _isBusy ? null : _loadModel,
+              child: const Text('Load model'),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _promptController,
+              minLines: 3,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                labelText: 'Prompt',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _isBusy || !_isLoaded ? null : _generate,
+              child: const Text('Generate'),
+            ),
+            const SizedBox(height: 24),
+            SelectableText(_output),
+          ],
+        ),
       ),
     );
   }

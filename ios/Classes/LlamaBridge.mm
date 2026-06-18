@@ -1,54 +1,65 @@
 #import "LlamaBridge.h"
-#import "core/include/llama.h"
+
+#include "LlamaEngine.hpp"
 
 @implementation LlamaBridge {
-    // 宣告為實體變數，讓後續的推論(生成對話)也能讀取
-    llama_model *model;
-    llama_context *ctx;
+    LlamaEngine *_engine;
 }
 
 - (instancetype)init {
     self = [super init];
     if (self) {
-        llama_backend_init();
+        _engine = new LlamaEngine();
     }
     return self;
 }
 
-- (BOOL)loadModelAtPath:(NSString *)path {
-    // 1. 防呆：如果已經有載入過舊模型，先清空記憶體
-    if (model != NULL) {
-        llama_free_model(model);
-        model = NULL;
-    }
-    
-    NSLog(@"[LlamaBridge] 準備載入模型，路徑為: %@", path);
-    // 將 Swift 傳來的 NSString 轉為 C 字串
-    const char *cPath = [path UTF8String];
-    
-    // 2. 配置模型參數
-    llama_model_params model_params = llama_model_default_params();
-    // 將運算層數開到最大，全部交給 Apple Silicon 的 Metal 引擎處理！
-    model_params.n_gpu_layers = 99; 
-    
-    // 3. 執行載入
-    model = llama_load_model_from_file(cPath, model_params);
-    
-    if (model == NULL) {
-        NSLog(@"[LlamaBridge] ❌ 模型載入失敗");
+- (BOOL)loadModelAtPath:(NSString *)path
+            contextSize:(int)contextSize
+              gpuLayers:(int)gpuLayers
+                threads:(int)threads {
+    if (path.length == 0) {
         return NO;
     }
-    
-    NSLog(@"[LlamaBridge] ✅ 模型載入成功！");
-    return YES;
+
+    return _engine->loadModel(
+        std::string(path.UTF8String),
+        contextSize,
+        gpuLayers,
+        threads
+    );
+}
+
+- (NSString *)generateWithPrompt:(NSString *)prompt
+                       maxTokens:(int)maxTokens
+                     temperature:(float)temperature
+                            topK:(int)topK
+                            topP:(float)topP {
+    if (prompt.length == 0) {
+        return @"";
+    }
+
+    std::string response = _engine->generate(
+        std::string(prompt.UTF8String),
+        maxTokens,
+        temperature,
+        topK,
+        topP
+    );
+
+    NSString *result = [[NSString alloc] initWithBytes:response.data()
+                                                length:response.size()
+                                              encoding:NSUTF8StringEncoding];
+    return result ?: @"";
+}
+
+- (void)disposeModel {
+    _engine->dispose();
 }
 
 - (void)dealloc {
-    // 確保物件銷毀時釋放 C++ 記憶體
-    if (model != NULL) {
-        llama_free_model(model);
-    }
-    llama_backend_free();
+    delete _engine;
+    _engine = nullptr;
 }
 
 @end

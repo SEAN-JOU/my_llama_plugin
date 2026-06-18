@@ -1,15 +1,47 @@
 # my_llama_plugin
 
-A new Flutter plugin project.
+A Flutter plugin that runs local `.gguf` language models on Android and iOS via
+llama.cpp.
 
-## Getting Started
+The current implementation is CPU-only on both platforms. It supports loading a
+model from a real device file path, generating a synchronous text completion,
+and releasing native memory.
 
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/to/develop-plugins),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
+## Usage
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```dart
+final llama = MyLlamaPlugin();
 
+final loaded = await llama.loadModel(
+  '/absolute/path/to/model.gguf',
+  contextSize: 2048,
+);
+
+if (loaded) {
+  final text = await llama.generate(
+    'Hello, my name is',
+    maxTokens: 128,
+    temperature: 0.8,
+  );
+  print(text);
+}
+
+await llama.disposeModel();
+```
+
+## Model files
+
+Pass a real filesystem path to `loadModel`. Flutter asset keys are not enough;
+copy or download the `.gguf` file into app-accessible storage first, then pass
+that absolute path.
+
+## Example
+
+The example app provides a small manual test screen:
+
+```sh
+cd example
+flutter run
+```
+
+Enter the `.gguf` model path, load it, then enter a prompt and generate.

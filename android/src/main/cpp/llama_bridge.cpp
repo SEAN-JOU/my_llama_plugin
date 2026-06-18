@@ -1,23 +1,93 @@
 #include <jni.h>
+
+#include <cstdint>
 #include <string>
-#include "../../../../../ios/Classes/core/include/llama.h"
+
+#include "LlamaEngine.hpp"
+
+namespace {
+LlamaEngine g_engine;
+
+std::string jstringToString(JNIEnv *env, jstring value) {
+    if (value == nullptr) {
+        return "";
+    }
+
+    const char *chars = env->GetStringUTFChars(value, nullptr);
+    if (chars == nullptr) {
+        return "";
+    }
+
+    std::string result(chars);
+    env->ReleaseStringUTFChars(value, chars);
+    return result;
+}
+
+jstring stringToJString(JNIEnv *env, const std::string &value) {
+    jbyteArray bytes = env->NewByteArray(static_cast<jsize>(value.size()));
+    if (bytes == nullptr) {
+        return env->NewStringUTF("");
+    }
+
+    env->SetByteArrayRegion(
+        bytes,
+        0,
+        static_cast<jsize>(value.size()),
+        reinterpret_cast<const jbyte *>(value.data())
+    );
+
+    jclass stringClass = env->FindClass("java/lang/String");
+    jmethodID constructor = env->GetMethodID(stringClass, "<init>", "([BLjava/lang/String;)V");
+    jstring charset = env->NewStringUTF("UTF-8");
+    auto result = static_cast<jstring>(env->NewObject(stringClass, constructor, bytes, charset));
+
+    env->DeleteLocalRef(bytes);
+    env->DeleteLocalRef(charset);
+    env->DeleteLocalRef(stringClass);
+
+    return result != nullptr ? result : env->NewStringUTF("");
+}
+} // namespace
 
 extern "C" JNIEXPORT jboolean JNICALL
-// 這裡的函式名稱必須嚴格對應您的 Kotlin Package 名稱
-// 假設您的 package 是 com.example.my_llama_plugin
-Java_com_example_my_1llama_1plugin_MyLlamaPlugin_loadModelNative(JNIEnv *env, jobject /* this */, jstring path) {
-    
-    // 將 Kotlin 傳來的字串轉成 C 字串
-    const char *nativeString = env->GetStringUTFChars(path, nullptr);
-    
-    // 初始化 llama
-    llama_backend_init();
-    
-    // 這裡先回傳 true 測試編譯
-    bool success = true; 
+Java_com_example_my_1llama_1plugin_MyLlamaPlugin_loadModelNative(
+    JNIEnv *env,
+    jobject /* this */,
+    jstring path,
+    jint contextSize,
+    jint gpuLayers,
+    jint threads
+) {
+    const std::string modelPath = jstringToString(env, path);
+    const bool success = g_engine.loadModel(modelPath, contextSize, gpuLayers, threads);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
 
-    // 釋放記憶體
-    env->ReleaseStringUTFChars(path, nativeString);
-    
-    return success;
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_my_1llama_1plugin_MyLlamaPlugin_generateNative(
+    JNIEnv *env,
+    jobject /* this */,
+    jstring prompt,
+    jint maxTokens,
+    jfloat temperature,
+    jint topK,
+    jfloat topP
+) {
+    const std::string promptString = jstringToString(env, prompt);
+    const std::string response = g_engine.generate(
+        promptString,
+        maxTokens,
+        temperature,
+        topK,
+        topP
+    );
+    return stringToJString(env, response);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_my_1llama_1plugin_MyLlamaPlugin_disposeModelNative(
+    JNIEnv * /* env */,
+    jobject /* this */
+) {
+    g_engine.dispose();
 }

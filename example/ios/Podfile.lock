@@ -20,8 +20,8 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
-  my_llama_plugin: 91a68dfef79fb2e3c72829debe29589114016a4e
+  integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
+  my_llama_plugin: 6eb403a8d8632dfdb10ab45b88ea9eca54a1ca18
 
 PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
 

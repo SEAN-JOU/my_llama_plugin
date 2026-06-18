@@ -16,4 +16,47 @@ class MethodChannelMyLlamaPlugin extends MyLlamaPluginPlatform {
     );
     return version;
   }
+
+  @override
+  Future<bool> loadModel(
+    String path, {
+    int contextSize = 2048,
+    int? gpuLayers,
+    int threads = 0,
+  }) async {
+    final args = <String, Object?>{
+      'path': path,
+      'contextSize': contextSize,
+      'threads': threads,
+    };
+    if (gpuLayers != null) {
+      args['gpuLayers'] = gpuLayers;
+    }
+
+    final result = await methodChannel.invokeMethod<bool>('loadModel', args);
+    return result ?? false;
+  }
+
+  @override
+  Future<String?> generate(
+    String prompt, {
+    int maxTokens = 128,
+    double temperature = 0.8,
+    int topK = 40,
+    double topP = 0.95,
+  }) {
+    return methodChannel.invokeMethod<String>('generate', {
+      'prompt': prompt,
+      'maxTokens': maxTokens,
+      'temperature': temperature,
+      'topK': topK,
+      'topP': topP,
+    });
+  }
+
+  @override
+  Future<bool> disposeModel() async {
+    final result = await methodChannel.invokeMethod<bool>('disposeModel');
+    return result ?? true;
+  }
 }
