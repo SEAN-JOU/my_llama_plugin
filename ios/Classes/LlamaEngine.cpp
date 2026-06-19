@@ -6,7 +6,6 @@
 #include <clocale>
 #include <cstdint>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace {
@@ -27,42 +26,6 @@ void ensureBackendInitialized() {
 
 int normalizePositive(int value, int fallback) {
     return value > 0 ? value : fallback;
-}
-
-int resolveDecodeThreads(int requested) {
-    if (requested > 0) {
-        return requested;
-    }
-
-#if defined(__ANDROID__)
-    const unsigned int cores = std::thread::hardware_concurrency();
-    if (cores == 0) {
-        return 4;
-    }
-
-    const int available = static_cast<int>(cores);
-    const int mobileDefault = available <= 4 ? available : available - 2;
-    return std::clamp(mobileDefault, 2, 6);
-#else
-    return 0;
-#endif
-}
-
-int resolveBatchThreads(int requested, int decodeThreads) {
-    if (requested > 0) {
-        return requested;
-    }
-
-#if defined(__ANDROID__)
-    const unsigned int cores = std::thread::hardware_concurrency();
-    if (cores == 0) {
-        return std::max(decodeThreads, 4);
-    }
-
-    return std::clamp(static_cast<int>(cores), std::max(decodeThreads, 2), 8);
-#else
-    return decodeThreads;
-#endif
 }
 } // namespace
 
@@ -99,10 +62,9 @@ bool LlamaEngine::loadModel(const std::string & path, int contextSize, int gpuLa
     ctxParams.offload_kqv        = (gpuLayers > 0);
     ctxParams.type_k             = GGML_TYPE_Q8_0;
     ctxParams.type_v             = GGML_TYPE_Q8_0;
-    const int decodeThreads = resolveDecodeThreads(threads);
-    if (decodeThreads > 0) {
-        ctxParams.n_threads       = decodeThreads;
-        ctxParams.n_threads_batch = resolveBatchThreads(threads, decodeThreads);
+    if (threads > 0) {
+        ctxParams.n_threads       = threads;
+        ctxParams.n_threads_batch = threads;
     }
 
     llama_context * ctx = llama_init_from_model(model, ctxParams);

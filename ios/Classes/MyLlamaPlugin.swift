@@ -1,9 +1,15 @@
 import Flutter
+import Darwin
 import UIKit
 
 public class MyLlamaPlugin: NSObject, FlutterPlugin {
     // 實體化我們的 Objective-C++ 橋樑
     let bridge = LlamaBridge()
+    private let nativeQueue = DispatchQueue(
+        label: "com.example.my_llama_plugin.native",
+        qos: .userInteractive,
+        autoreleaseFrequency: .workItem
+    )
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let channel = FlutterMethodChannel(name: "my_llama_plugin", binaryMessenger: registrar.messenger())
@@ -23,13 +29,14 @@ public class MyLlamaPlugin: NSObject, FlutterPlugin {
             let gpuLayers = args["gpuLayers"] as? Int ?? 0
             let threads = args["threads"] as? Int ?? 0
 
-            let success = bridge.loadModel(
-                atPath: path,
-                contextSize: Int32(contextSize),
-                gpuLayers: Int32(gpuLayers),
-                threads: Int32(threads)
-            )
-            result(success)
+            runOnNativeThread(result) { [bridge = self.bridge] in
+                bridge.loadModel(
+                    atPath: path,
+                    contextSize: Int32(contextSize),
+                    gpuLayers: Int32(gpuLayers),
+                    threads: Int32(threads)
+                )
+            }
         } else if call.method == "generate" {
             guard let args = call.arguments as? [String: Any],
                   let prompt = args["prompt"] as? String else {
@@ -42,21 +49,34 @@ public class MyLlamaPlugin: NSObject, FlutterPlugin {
             let topK = args["topK"] as? Int ?? 40
             let topP = args["topP"] as? Double ?? 0.95
 
-            let response = bridge.generate(
-                withPrompt: prompt,
-                maxTokens: Int32(maxTokens),
-                temperature: Float(temperature),
-                topK: Int32(topK),
-                topP: Float(topP)
-            )
-            result(response)
+            runOnNativeThread(result) { [bridge = self.bridge] in
+                bridge.generate(
+                    withPrompt: prompt,
+                    maxTokens: Int32(maxTokens),
+                    temperature: Float(temperature),
+                    topK: Int32(topK),
+                    topP: Float(topP)
+                )
+            }
         } else if call.method == "disposeModel" {
-            bridge.disposeModel()
-            result(true)
+            runOnNativeThread(result) { [bridge = self.bridge] in
+                bridge.disposeModel()
+                return true
+            }
         } else if call.method == "getPlatformVersion" {
             result("iOS " + UIDevice.current.systemVersion)
         } else {
             result(FlutterMethodNotImplemented)
+        }
+    }
+
+    private func runOnNativeThread(_ result: @escaping FlutterResult, _ block: @escaping () -> Any?) {
+        nativeQueue.async {
+            _ = pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
+            let value = block()
+            DispatchQueue.main.async {
+                result(value)
+            }
         }
     }
 }
