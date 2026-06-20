@@ -56,5 +56,10 @@ target_include_directories(my_llama_plugin PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ios/Classes
 )
 
+target_link_options(my_llama_plugin PRIVATE
+    "-Wl,-z,max-page-size=16384"
+    "-Wl,-z,common-page-size=16384"
+)
+
 # 4. 將 llama.cpp 連結到我們的橋樑上
 target_link_libraries(my_llama_plugin llama android log)
