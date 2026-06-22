@@ -1,0 +1,4 @@
+module LlamaCore {
+    header "LlamaBridge.h"
+    export *
+}

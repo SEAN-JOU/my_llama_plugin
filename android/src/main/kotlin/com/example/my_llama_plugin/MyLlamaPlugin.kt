@@ -16,16 +16,6 @@ class MyLlamaPlugin: FlutterPlugin, MethodCallHandler {
   private val executor: ExecutorService = Executors.newSingleThreadExecutor()
   private val mainHandler = Handler(Looper.getMainLooper())
 
-  // 1. 載入 CMake 編譯出來的 C++ 庫
-  init {
-      System.loadLibrary("my_llama_plugin")
-  }
-
-  // 2. 宣告 JNI 原生方法
-  private external fun loadModelNative(path: String, contextSize: Int, gpuLayers: Int, threads: Int): Boolean
-  private external fun generateNative(prompt: String, maxTokens: Int, temperature: Float, topK: Int, topP: Float): String
-  private external fun disposeModelNative()
-
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "my_llama_plugin")
     channel.setMethodCallHandler(this)
@@ -39,7 +29,7 @@ class MyLlamaPlugin: FlutterPlugin, MethodCallHandler {
         val gpuLayers = call.argument<Int>("gpuLayers") ?: 0
         val threads = call.argument<Int>("threads") ?: 0
         runOnNativeThread(result) {
-          loadModelNative(path, contextSize, gpuLayers, threads)
+          MyLlamaNative.loadModel(path, contextSize, gpuLayers, threads)
         }
       }
       "generate" -> {
@@ -49,12 +39,12 @@ class MyLlamaPlugin: FlutterPlugin, MethodCallHandler {
         val topK = call.argument<Int>("topK") ?: 40
         val topP = call.argument<Double>("topP")?.toFloat() ?: 0.95f
         runOnNativeThread(result) {
-          generateNative(prompt, maxTokens, temperature, topK, topP)
+          MyLlamaNative.generate(prompt, maxTokens, temperature, topK, topP)
         }
       }
       "disposeModel" -> {
         runOnNativeThread(result) {
-          disposeModelNative()
+          MyLlamaNative.disposeModel()
           true
         }
       }

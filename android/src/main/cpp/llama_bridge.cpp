@@ -47,12 +47,9 @@ jstring stringToJString(JNIEnv *env, const std::string &value) {
 
     return result != nullptr ? result : env->NewStringUTF("");
 }
-} // namespace
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_example_my_1llama_1plugin_MyLlamaPlugin_loadModelNative(
+jboolean loadModel(
     JNIEnv *env,
-    jobject /* this */,
     jstring path,
     jint contextSize,
     jint gpuLayers,
@@ -63,10 +60,8 @@ Java_com_example_my_1llama_1plugin_MyLlamaPlugin_loadModelNative(
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_example_my_1llama_1plugin_MyLlamaPlugin_generateNative(
+jstring generate(
     JNIEnv *env,
-    jobject /* this */,
     jstring prompt,
     jint maxTokens,
     jfloat temperature,
@@ -84,10 +79,40 @@ Java_com_example_my_1llama_1plugin_MyLlamaPlugin_generateNative(
     return stringToJString(env, response);
 }
 
+void disposeModel() {
+    g_engine.dispose();
+}
+} // namespace
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_my_1llama_1plugin_MyLlamaNative_loadModelNative(
+    JNIEnv *env,
+    jobject /* this */,
+    jstring path,
+    jint contextSize,
+    jint gpuLayers,
+    jint threads
+) {
+    return loadModel(env, path, contextSize, gpuLayers, threads);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_example_my_1llama_1plugin_MyLlamaNative_generateNative(
+    JNIEnv *env,
+    jobject /* this */,
+    jstring prompt,
+    jint maxTokens,
+    jfloat temperature,
+    jint topK,
+    jfloat topP
+) {
+    return generate(env, prompt, maxTokens, temperature, topK, topP);
+}
+
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_my_1llama_1plugin_MyLlamaPlugin_disposeModelNative(
+Java_com_example_my_1llama_1plugin_MyLlamaNative_disposeModelNative(
     JNIEnv * /* env */,
     jobject /* this */
 ) {
-    g_engine.dispose();
+    disposeModel();
 }
