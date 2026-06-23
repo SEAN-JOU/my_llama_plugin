@@ -44,6 +44,12 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDirs("src/main/kotlin")
+            // Flutter 專案的 rootProject 在 android/ 資料夾，其上層有 pubspec.yaml
+            // 純 Android 專案不會有 pubspec.yaml，所以排除 Flutter-only 的橋接檔
+            val pubspec = rootProject.projectDir.parentFile?.resolve("pubspec.yaml")
+            if (pubspec?.exists() != true) {
+                java.exclude("**/MyLlamaPlugin.kt")
+            }
         }
         getByName("test") {
             java.srcDirs("src/test/kotlin")
