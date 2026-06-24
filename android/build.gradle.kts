@@ -44,11 +44,12 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDirs("src/main/kotlin")
-            // Flutter 專案的 rootProject 在 android/ 資料夾，其上層有 pubspec.yaml
-            // 純 Android 專案不會有 pubspec.yaml，所以排除 Flutter-only 的橋接檔
+            // Flutter 專案的 rootProject 在 android/ 資料夾，其上層有 pubspec.yaml。
+            // 只有偵測到 Flutter 專案時，才把 Flutter bridge 加進 source set；
+            // 純 Android 專案不需要也無法引用 Flutter SDK，所以 src/flutter/ 不加入。
             val pubspec = rootProject.projectDir.parentFile?.resolve("pubspec.yaml")
-            if (pubspec?.exists() != true) {
-                java.exclude("**/MyLlamaPlugin.kt")
+            if (pubspec?.exists() == true) {
+                java.srcDirs("src/flutter/kotlin")
             }
         }
         getByName("test") {

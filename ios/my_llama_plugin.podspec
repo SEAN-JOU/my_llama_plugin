@@ -1,5 +1,4 @@
 Pod::Spec.new do |s|
-  # --- 必要的基礎資訊 (剛剛遺失的部分) ---
   s.name             = 'my_llama_plugin'
   s.version          = '0.0.1'
   s.summary          = 'A new Flutter plugin project for llama.cpp.'
@@ -9,39 +8,52 @@ Pod::Spec.new do |s|
   s.author           = { 'Your Company' => 'email@example.com' }
   s.source           = { :path => '.' }
 
-  # 1. 只編進 Flutter bridge 與 llama.cpp/ggml 核心，避免 tools/examples/tests 裡的 main() 進入 plugin。
-  s.source_files = [
-    'Classes/*.{swift,h,hpp,mm,cpp}',
-    'Classes/core/include/**/*.h',
-    'Classes/core/src/**/*.{h,cpp}',
-    'Classes/core/ggml/include/**/*.h',
-    'Classes/core/ggml/src/*.{h,c,cpp}',
-    'Classes/core/ggml/src/ggml-cpu/*.{h,c,cpp}',
-    'Classes/core/ggml/src/ggml-cpu/arch/arm/*.{h,c,cpp}'
-  ]
+  # ── Core subspec ────────────────────────────────────────────────────────────
+  # 純原生 llama.cpp 引擎 + Objective-C++ 橋樑，不依賴 Flutter。
+  # 純 iOS App 或 macOS App 只需要加這個 subspec。
+  s.subspec 'Core' do |core|
+    core.source_files = [
+      'Classes/LlamaBridge.h',
+      'Classes/LlamaBridge.mm',
+      'Classes/LlamaEngine.cpp',
+      'Classes/LlamaEngine.hpp',
+      'Classes/core/include/**/*.h',
+      'Classes/core/src/**/*.{h,cpp}',
+      'Classes/core/ggml/include/**/*.h',
+      'Classes/core/ggml/src/*.{h,c,cpp}',
+      'Classes/core/ggml/src/ggml-cpu/*.{h,c,cpp}',
+      'Classes/core/ggml/src/ggml-cpu/arch/arm/*.{h,c,cpp}'
+    ]
+    core.private_header_files = 'Classes/LlamaEngine.hpp', 'Classes/core/**/*.h'
+    core.frameworks = 'Foundation', 'Accelerate'
+    core.compiler_flags = '-DGGML_USE_CPU -DGGML_VERSION=\"0.15.1\" -DGGML_COMMIT=\"unknown\"'
+    core.pod_target_xcconfig = {
+      'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
+      'HEADER_SEARCH_PATHS' => [
+        '$(PODS_TARGET_SRCROOT)/Classes',
+        '$(PODS_TARGET_SRCROOT)/Classes/core/include',
+        '$(PODS_TARGET_SRCROOT)/Classes/core/src',
+        '$(PODS_TARGET_SRCROOT)/Classes/core/ggml/include',
+        '$(PODS_TARGET_SRCROOT)/Classes/core/ggml/src',
+        '$(PODS_TARGET_SRCROOT)/Classes/core/ggml/src/ggml-cpu'
+      ].join(' ')
+    }
+  end
 
-  # 2. 將 llama.cpp 的標頭檔標記為私有，避免 Xcode 扁平化匯出產生碰撞
-  s.private_header_files = 'Classes/LlamaEngine.hpp', 'Classes/core/**/*.h'
+  # ── Flutter subspec ──────────────────────────────────────────────────────────
+  # Flutter MethodChannel bridge，只有 Flutter 專案才需要這個 subspec。
+  # Flutter plugin 機制會自動以此為預設 subspec（pubspec.yaml 裡的 plugin: platforms: ios）。
+  s.subspec 'Flutter' do |fl|
+    fl.dependency 'my_llama_plugin/Core'
+    fl.dependency 'Flutter'
+    fl.source_files  = 'Classes/MyLlamaPlugin.swift'
+    fl.pod_target_xcconfig = {
+      'DEFINES_MODULE' => 'YES'
+    }
+  end
 
-  # 3. Flutter 與平台設定
-  s.dependency 'Flutter'
+  # Flutter plugin 工具鏈預設抓第一個 subspec；明確指定讓行為可預期。
+  s.default_subspec = 'Flutter'
+
   s.platform = :ios, '12.0'
-  
-  # 4. 第一版先走 CPU backend，後續可再加入 Metal/Vulkan 加速。
-  s.frameworks = 'Foundation', 'Accelerate'
-
-  # 5. 開啟 CPU backend 與 C++17 標準
-  s.compiler_flags = '-DGGML_USE_CPU -DGGML_VERSION=\"0.15.1\" -DGGML_COMMIT=\"unknown\"'
-  s.pod_target_xcconfig = {
-    'DEFINES_MODULE' => 'YES',
-    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
-    'HEADER_SEARCH_PATHS' => [
-      '$(PODS_TARGET_SRCROOT)/Classes',
-      '$(PODS_TARGET_SRCROOT)/Classes/core/include',
-      '$(PODS_TARGET_SRCROOT)/Classes/core/src',
-      '$(PODS_TARGET_SRCROOT)/Classes/core/ggml/include',
-      '$(PODS_TARGET_SRCROOT)/Classes/core/ggml/src',
-      '$(PODS_TARGET_SRCROOT)/Classes/core/ggml/src/ggml-cpu'
-    ].join(' ')
-  }
 end
