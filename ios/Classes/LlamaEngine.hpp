@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 #include <mutex>
 #include <string>
 
@@ -17,6 +18,17 @@ public:
 
     bool loadModel(const std::string & path, int contextSize, int gpuLayers, int threads);
     std::string generate(const std::string & prompt, int maxTokens, float temperature, int topK, float topP);
+
+    // tokenCallback 每個 token 呼叫一次；回傳 false 可提前中止生成
+    void generateStream(
+        const std::string & prompt,
+        int maxTokens,
+        float temperature,
+        int topK,
+        float topP,
+        std::function<bool(const std::string &)> tokenCallback
+    );
+
     void dispose();
 
 private:

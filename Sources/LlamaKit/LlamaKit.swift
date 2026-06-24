@@ -1,5 +1,9 @@
 import Foundation
+import Darwin
 import LlamaCore
+#if canImport(Darwin)
+import Darwin.sys.sysctl
+#endif
 
 public enum LlamaError: Error, LocalizedError {
     case modelLoadFailed
@@ -26,6 +30,14 @@ public final class LlamaKit: @unchecked Sendable {
 
     public init() {}
 
+    // 只計 P-core（性能核），排除 E-core 以避免推理效能下降
+    private static func performanceCoreCount() -> Int {
+        var count: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        sysctlbyname("hw.perflevel0.logicalcpu", &count, &size, nil, 0)
+        return count > 0 ? Int(count) : ProcessInfo.processInfo.activeProcessorCount
+    }
+
     // MARK: - Public API
 
     /// 載入 GGUF 模型檔案。
@@ -38,16 +50,17 @@ public final class LlamaKit: @unchecked Sendable {
     public func loadModel(
         path: String,
         contextSize: Int = 2048,
-        gpuLayers: Int = 0,
+        gpuLayers: Int = 99,
         threads: Int = 0
     ) async throws -> Bool {
-        try await withCheckedThrowingContinuation { continuation in
+        let resolvedThreads = threads > 0 ? threads : LlamaKit.performanceCoreCount()
+        return try await withCheckedThrowingContinuation { continuation in
             queue.async { [bridge = self.bridge] in
                 let ok = bridge.loadModel(
                     atPath: path,
                     contextSize: Int32(contextSize),
                     gpuLayers: Int32(gpuLayers),
-                    threads: Int32(threads)
+                    threads: Int32(resolvedThreads)
                 )
                 if ok {
                     continuation.resume(returning: true)
@@ -76,6 +89,7 @@ public final class LlamaKit: @unchecked Sendable {
         guard !prompt.isEmpty else { throw LlamaError.emptyPrompt }
         return await withCheckedContinuation { continuation in
             queue.async { [bridge = self.bridge] in
+                pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
                 let result = bridge.generate(
                     withPrompt: prompt,
                     maxTokens: Int32(maxTokens),
@@ -84,6 +98,36 @@ public final class LlamaKit: @unchecked Sendable {
                     topP: Float(topP)
                 )
                 continuation.resume(returning: result)
+            }
+        }
+    }
+
+    /// 逐 token 串流生成，每個 token 立即透過 AsyncThrowingStream 傳回。
+    public func generateStream(
+        prompt: String,
+        maxTokens: Int = 128,
+        temperature: Double = 0.8,
+        topK: Int = 40,
+        topP: Double = 0.95
+    ) -> AsyncThrowingStream<String, Error> {
+        guard !prompt.isEmpty else {
+            return AsyncThrowingStream { $0.finish(throwing: LlamaError.emptyPrompt) }
+        }
+        return AsyncThrowingStream { continuation in
+            queue.async { [bridge = self.bridge] in
+                pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
+                bridge.generateStream(
+                    withPrompt: prompt,
+                    maxTokens: Int32(maxTokens),
+                    temperature: Float(temperature),
+                    topK: Int32(topK),
+                    topP: Float(topP),
+                    tokenCallback: { piece in
+                        continuation.yield(piece)
+                        return true
+                    }
+                )
+                continuation.finish()
             }
         }
     }

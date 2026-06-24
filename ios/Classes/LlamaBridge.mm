@@ -53,6 +53,30 @@
     return result ?: @"";
 }
 
+- (void)generateStreamWithPrompt:(NSString *)prompt
+                       maxTokens:(int)maxTokens
+                     temperature:(float)temperature
+                            topK:(int)topK
+                            topP:(float)topP
+                   tokenCallback:(LlamaTokenCallback)tokenCallback {
+    if (prompt.length == 0 || tokenCallback == nil) {
+        return;
+    }
+    _engine->generateStream(
+        std::string(prompt.UTF8String),
+        maxTokens,
+        temperature,
+        topK,
+        topP,
+        [tokenCallback](const std::string & piece) -> bool {
+            NSString * nsPiece = [[NSString alloc] initWithBytes:piece.data()
+                                                          length:piece.size()
+                                                        encoding:NSUTF8StringEncoding];
+            return tokenCallback(nsPiece ?: @"");
+        }
+    );
+}
+
 - (void)disposeModel {
     _engine->dispose();
 }
